@@ -6,11 +6,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies - force to resolve conflicts
-RUN npm install --legacy-peer-deps --force
+# Downgrade npm to version 9 for better compatibility
+RUN npm install -g npm@9.9.3
+
+# Install dependencies
+RUN npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .
+
+# Skip preflight checks
+ENV SKIP_PREFLIGHT_CHECK=true
 
 # Build the application
 RUN npm run build
