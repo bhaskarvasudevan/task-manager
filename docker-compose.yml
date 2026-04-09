@@ -37,8 +37,8 @@ services:
       retries: 5
 
   backend:
-    # Uses: ghcr.io/yourusername/task-backend:latest
-    image: ${DOCKER_REGISTRY:-ghcr.io/yourusername}/task-backend:${IMAGE_TAG:-latest}
+    # Uses: ghcr.io/bhaskrvasudevan/task-backend:latest
+    image: ${DOCKER_REGISTRY:-ghcr.io/bhaskarvasudevan}/task-backend:${IMAGE_TAG:-latest}
     container_name: task-backend
     environment:
       - DB_HOST=mssql
@@ -60,8 +60,8 @@ services:
     restart: unless-stopped
 
   api-gateway:
-    # Uses: ghcr.io/yourusername/task-gateway:latest
-    image: ${DOCKER_REGISTRY:-ghcr.io/yourusername}/task-gateway:${IMAGE_TAG:-latest}
+    # Uses: ghcr.io/bhaskarvasudevan/task-gateway:latest
+    image: ${DOCKER_REGISTRY:-ghcr.io/bhaskarvasudevan}/task-gateway:${IMAGE_TAG:-latest}
     container_name: task-gateway
     environment:
       - BACKEND_HOST=backend
@@ -74,8 +74,8 @@ services:
     restart: unless-stopped
 
   frontend:
-    # Uses: ghcr.io/yourusername/task-frontend:latest
-    image: ${DOCKER_REGISTRY:-ghcr.io/yourusername}/task-frontend:${IMAGE_TAG:-latest}
+    # Uses: ghcr.io/bhaskarvasudevan/task-frontend:latest
+    image: ${DOCKER_REGISTRY:-ghcr.io/bhaskarvasudevan}/task-frontend:${IMAGE_TAG:-latest}
     container_name: task-frontend
     ports:
       - "80:80"
