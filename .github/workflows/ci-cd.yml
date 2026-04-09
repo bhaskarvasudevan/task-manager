@@ -34,9 +34,9 @@ deploy:
           if [ ! -f .env ]; then
             echo "Creating .env file..."
             cat > .env << 'ENVEOF'
-DOCKER_REGISTRY=${{ secrets.DOCKER_REGISTRY }}
-IMAGE_TAG=latest
-ENVEOF
+            DOCKER_REGISTRY=${{ secrets.DOCKER_REGISTRY }}
+            IMAGE_TAG=latest
+            ENVEOF
           fi
           
           # Set environment variables
