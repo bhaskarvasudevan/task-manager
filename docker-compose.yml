@@ -46,6 +46,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=YourStrong@Passw0rd
       - SPRING_REDIS_HOST=task-redis
       - SPRING_REDIS_PORT=6379
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
     ports:
       - "8081:8080"
     networks:
@@ -54,12 +56,6 @@ services:
       - task-mssql
       - task-redis
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
 
   task-gateway:
     image: ghcr.io/bhaskarvasudevan/task-gateway:latest
@@ -67,6 +63,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - BACKEND_SERVICE_URL=http://task-backend:8080
+      - SERVER_PORT=8080
     ports:
       - "8080:8080"
     networks:
@@ -74,12 +71,6 @@ services:
     depends_on:
       - task-backend
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
 
   task-frontend:
     image: ghcr.io/bhaskarvasudevan/task-frontend:latest
