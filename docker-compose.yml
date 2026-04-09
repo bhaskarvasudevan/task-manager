@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: task-mssql
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks:
+      - task-network
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: task-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - task-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    image: ${DOCKER_REGISTRY}/task-backend:${IMAGE_TAG:-latest}
+    container_name: task-backend
+    environment:
+      - DB_HOST=mssql
+      - DB_PORT=1433
+      - DB_NAME=taskdb
+      - DB_USER=sa
+      - DB_PASSWORD=YourStrong@Passw0rd
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      mssql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - task-network
+    restart: unless-stopped
+
+  api-gateway:
+    image: ${DOCKER_REGISTRY}/task-gateway:${IMAGE_TAG:-latest}
+    container_name: task-gateway
+    environment:
+      - BACKEND_HOST=backend
+    ports:
+      - "8081:8081"
+    depends_on:
+      - backend
+    networks:
+      - task-network
+    restart: unless-stopped
+
+  frontend:
+    image: ${DOCKER_REGISTRY}/task-frontend:${IMAGE_TAG:-latest}
+    container_name: task-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - task-network
+    restart: unless-stopped
+
+volumes:
+  mssql-data:
+  redis-data:
+
+networks:
+  task-network:
+    driver: bridge

@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: api-gateway
+  
+  # Enable Virtual Threads (Java 21)
+  threads:
+    virtual:
+      enabled: true
+  
+  cloud:
+    gateway:
+      routes:
+        - id: backend-service
+          uri: http://${BACKEND_HOST:backend}:8080
+          predicates:
+            - Path=/api/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /api/$\{segment}
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+
+server:
+  port: 8081
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
