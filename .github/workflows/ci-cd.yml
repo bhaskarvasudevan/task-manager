@@ -13,7 +13,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # Backend Build and Test
   backend-build:
     name: Build and Test Backend
     runs-on: ubuntu-latest
@@ -46,7 +45,6 @@ jobs:
           path: backend/target/*.jar
           retention-days: 1
 
-  # API Gateway Build and Test
   gateway-build:
     name: Build and Test API Gateway
     runs-on: ubuntu-latest
@@ -79,7 +77,6 @@ jobs:
           path: api-gateway/target/*.jar
           retention-days: 1
 
-  # Frontend Build and Test
   frontend-build:
     name: Build and Test Frontend
     runs-on: ubuntu-latest
@@ -110,7 +107,6 @@ jobs:
           cd frontend
           npm run build
 
-  # Docker Build and Push
   docker-build-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
@@ -120,8 +116,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
+      attestations: write
     
     steps:
       - name: Checkout code
@@ -134,8 +130,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
       
       - name: Extract metadata for Backend
         id: meta-backend
@@ -197,7 +193,6 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: mode=max
 
-  # Deploy to Server
   deploy:
     name: Deploy to Rocky Linux 9 (Hetzner VM)
     runs-on: ubuntu-latest
@@ -236,5 +231,16 @@ jobs:
             export DOCKER_REGISTRY=${{ env.DOCKER_REGISTRY }}
             export IMAGE_TAG=latest
             
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             
+            docker compose pull
+            docker compose down
+            docker compose up -d
+            
+            echo "Waiting for services to start..."
+            sleep 15
+            
+            docker compose ps
+            docker compose logs --tail=50
+            
+            echo "Deployment completed successfully!"
