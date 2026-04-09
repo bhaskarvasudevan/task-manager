@@ -1,3 +1,9 @@
+version: '3.8'
+
+networks:
+  task-network:
+    driver: bridge
+
 services:
   task-mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -8,34 +14,30 @@ services:
       - MSSQL_PID=Developer
     ports:
       - "1433:1433"
-    volumes:
-      - mssql-data:/var/opt/mssql
     networks:
       - task-network
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Passw0rd' -Q 'SELECT 1' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    volumes:
+      - mssql-data:/var/opt/mssql
+    restart: unless-stopped
 
   task-redis:
     image: redis:7-alpine
     container_name: task-redis
     ports:
       - "6379:6379"
-    volumes:
-      - redis-data:/data
     networks:
       - task-network
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   task-backend:
-    image: ${DOCKER_REGISTRY}/task-backend:${IMAGE_TAG:-latest}
+    image: ghcr.io/bhaskarvasudevan/task-backend:latest
     container_name: task-backend
     environment:
       - SPRING_PROFILES_ACTIVE=prod
@@ -49,41 +51,38 @@ services:
     networks:
       - task-network
     depends_on:
-      task-mssql:
-        condition: service_healthy
-      task-redis:
-        condition: service_healthy
+      - task-mssql
+      - task-redis
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 120s
 
   task-gateway:
-    image: ${DOCKER_REGISTRY}/task-gateway:${IMAGE_TAG:-latest}
+    image: ghcr.io/bhaskarvasudevan/task-gateway:latest
     container_name: task-gateway
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - BACKEND_SERVICE_URL=http://task-backend:8081
+      - BACKEND_SERVICE_URL=http://task-backend:8080
     ports:
       - "8080:8080"
     networks:
       - task-network
     depends_on:
-      task-backend:
-        condition: service_healthy
+      - task-backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 90s
 
   task-frontend:
-    image: ${DOCKER_REGISTRY}/task-frontend:${IMAGE_TAG:-latest}
+    image: ghcr.io/bhaskarvasudevan/task-frontend:latest
     container_name: task-frontend
     environment:
       - REACT_APP_API_URL=http://localhost:8080
@@ -95,10 +94,7 @@ services:
       - task-gateway
     restart: unless-stopped
 
-networks:
-  task-network:
-    driver: bridge
-
 volumes:
   mssql-data:
   redis-data:
+EOF
