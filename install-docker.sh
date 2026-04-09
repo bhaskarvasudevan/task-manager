@@ -21,3 +21,7 @@ sudo usermod -aG docker $(whoami)
 
 # Apply group changes (logout/login or use newgrp)
 newgrp docker
+
+# Check docker version
+docker --version
+docker compose version
