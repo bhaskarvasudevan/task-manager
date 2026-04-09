@@ -159,7 +159,7 @@ jobs:
           cache-to: type=registry,ref=${{ secrets.DOCKER_REGISTRY }}/task-frontend:buildcache,mode=max
 
   deploy:
-    name: Deploy to Hetzner VM
+    name: Deploy to Rocky Linux 9 (Hetzner VM)
     runs-on: ubuntu-latest
     needs: docker-build-push
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -168,7 +168,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Deploy to server via SSH
+      - name: Deploy to Rocky Linux server via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -176,35 +176,144 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
+            set -e  # Exit on error
+            
+            echo "=========================================="
+            echo "Starting deployment on Rocky Linux 9"
+            echo "=========================================="
+            
             # Navigate to deployment directory
-            cd /opt/task-manager || exit 1
+            echo "Navigating to deployment directory..."
+            cd /opt/task-manager || {
+              echo "ERROR: /opt/task-manager directory not found!"
+              echo "Please run the setup script first."
+              exit 1
+            }
             
             # Pull latest docker-compose file
-            curl -O https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml
+            echo "Downloading latest docker-compose.yml..."
+            curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml || {
+              echo "ERROR: Failed to download docker-compose.yml"
+              exit 1
+            }
             
             # Set environment variables
+            echo "Setting environment variables..."
             export DOCKER_REGISTRY=${{ secrets.DOCKER_REGISTRY }}
             export IMAGE_TAG=${{ github.sha }}
             
             # Login to Docker registry
-            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+            echo "Logging into Docker registry..."
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_USERNAME }} --password-stdin || {
+              echo "ERROR: Docker login failed"
+              exit 1
+            }
             
             # Pull new images
-            docker-compose pull
+            echo "Pulling new Docker images..."
+            docker compose pull || {
+              echo "ERROR: Failed to pull Docker images"
+              exit 1
+            }
             
             # Stop and remove old containers
-            docker-compose down
+            echo "Stopping old containers..."
+            docker compose down --remove-orphans || true
+            
+            # Prune old containers and networks
+            echo "Cleaning up old resources..."
+            docker container prune -f || true
+            docker network prune -f || true
             
             # Start new containers
-            docker-compose up -d
+            echo "Starting new containers..."
+            docker compose up -d || {
+              echo "ERROR: Failed to start containers"
+              docker compose logs
+              exit 1
+            }
             
             # Wait for services to be healthy
-            sleep 10
+            echo "Waiting for services to start..."
+            sleep 20
             
-            # Clean up old images
-            docker image prune -af
+            # Check container health
+            echo "Checking container status..."
+            UNHEALTHY=$(docker compose ps --format json | jq -r 'select(.Health == "unhealthy") | .Name' 2>/dev/null || true)
+            if [ -n "$UNHEALTHY" ]; then
+              echo "WARNING: Some containers are unhealthy: $UNHEALTHY"
+              docker compose logs --tail=50
+            fi
             
-            # Show running containers
-            docker-compose ps
+            # Display container status
+            echo ""
+            echo "=========================================="
+            echo "Container Status:"
+            echo "=========================================="
+            docker compose ps
             
+            # Show resource usage
+            echo ""
+            echo "=========================================="
+            echo "Resource Usage:"
+            echo "=========================================="
+            docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+            
+            # Clean up old images (keep last 3 versions)
+            echo ""
+            echo "Cleaning up old Docker images..."
+            docker image prune -af --filter "until=72h" || true
+            
+            # Show disk usage
+            echo ""
+            echo "=========================================="
+            echo "Docker Disk Usage:"
+            echo "=========================================="
+            docker system df
+            
+            # Verify application is responding
+            echo ""
+            echo "Verifying application health..."
+            sleep 5
+            
+            # Check if frontend is accessible
+            if curl -f -s -o /dev/null -w "%{http_code}" http://localhost:80 | grep -q "200\|301\|302"; then
+              echo "✓ Frontend is accessible"
+            else
+              echo "✗ WARNING: Frontend may not be accessible"
+            fi
+            
+            # Check if API Gateway is accessible
+            if curl -f -s -o /dev/null -w "%{http_code}" http://localhost:8081 | grep -q "200\|404"; then
+              echo "✓ API Gateway is accessible"
+            else
+              echo "✗ WARNING: API Gateway may not be accessible"
+            fi
+            
+            # Check if Backend is accessible
+            if curl -f -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/tasks | grep -q "200"; then
+              echo "✓ Backend API is accessible"
+            else
+              echo "✗ WARNING: Backend API may not be accessible"
+            fi
+            
+            echo ""
+            echo "=========================================="
             echo "Deployment completed successfully!"
+            echo "Commit: ${{ github.sha }}"
+            echo "Time: $(date)"
+            echo "=========================================="
+            
+            # Logout from Docker registry
+            docker logout ${{ secrets.DOCKER_REGISTRY }} || true
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "### Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server**: Rocky Linux 9" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u)" >> $GITHUB_STEP_SUMMARY
