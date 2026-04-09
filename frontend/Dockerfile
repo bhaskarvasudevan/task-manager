@@ -6,17 +6,19 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Downgrade npm to version 9 for better compatibility
-RUN npm install -g npm@9.9.3
-
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Clean and install with force
+RUN npm cache clean --force && \
+    npm install --legacy-peer-deps --force && \
+    npm install ajv@8.12.0 --save --force && \
+    npm install ajv-keywords@5.1.0 --save --force
 
 # Copy source code
 COPY . .
 
-# Skip preflight checks
+# Set environment variables
 ENV SKIP_PREFLIGHT_CHECK=true
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV GENERATE_SOURCEMAP=false
 
 # Build the application
 RUN npm run build
@@ -27,7 +29,7 @@ FROM nginx:alpine
 # Copy built files from build stage
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Copy nginx configuration
+# Copy nginx configuration  
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
