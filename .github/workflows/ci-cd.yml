@@ -93,10 +93,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       
-      - name: Install Frontend Dependencies
+      - name: Install Frontend Dependencies and Fix ajv
         run: |
           cd frontend
           npm install --legacy-peer-deps
+          npm install ajv@8.12.0 ajv-keywords@5.1.0 --save --legacy-peer-deps
       
       - name: Run Frontend Tests
         run: |
@@ -237,14 +238,3 @@ jobs:
             
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            docker compose pull
-            docker compose down
-            docker compose up -d
-            
-            echo "Waiting for services to start..."
-            sleep 15
-            
-            docker compose ps
-            docker compose logs --tail=50
-            
-            echo "Deployment completed successfully!"
