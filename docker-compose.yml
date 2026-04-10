@@ -55,7 +55,10 @@ services:
     ports:
       - "8081:8080"
     networks:
-      - task-network
+      task-network:
+        aliases:
+          - backend
+          - task-backend
     depends_on:
       task-redis:
         condition: service_healthy
@@ -80,9 +83,6 @@ services:
     depends_on:
       - task-backend
     restart: unless-stopped
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
 
   task-frontend:
     image: ghcr.io/bhaskarvasudevan/task-frontend:latest
