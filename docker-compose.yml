@@ -8,6 +8,7 @@ services:
   task-mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: task-mssql
+    hostname: task-mssql
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=YourStrong@Passw0rd
@@ -23,6 +24,8 @@ services:
   task-redis:
     image: redis:7-alpine
     container_name: task-redis
+    hostname: task-redis
+    command: redis-server --bind 0.0.0.0 --protected-mode no
     ports:
       - "6379:6379"
     networks:
@@ -39,6 +42,7 @@ services:
   task-backend:
     image: ghcr.io/bhaskarvasudevan/task-backend:latest
     container_name: task-backend
+    hostname: task-backend
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_DATASOURCE_URL=jdbc:sqlserver://task-mssql:1433;databaseName=taskmanager;encrypt=true;trustServerCertificate=true
@@ -46,20 +50,23 @@ services:
       - SPRING_DATASOURCE_PASSWORD=YourStrong@Passw0rd
       - SPRING_REDIS_HOST=task-redis
       - SPRING_REDIS_PORT=6379
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
-      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
+      - SPRING_DATA_REDIS_HOST=task-redis
+      - SPRING_DATA_REDIS_PORT=6379
     ports:
       - "8081:8080"
     networks:
       - task-network
     depends_on:
-      - task-mssql
-      - task-redis
+      task-redis:
+        condition: service_healthy
+      task-mssql:
+        condition: service_started
     restart: unless-stopped
 
   task-gateway:
     image: ghcr.io/bhaskarvasudevan/task-gateway:latest
     container_name: task-gateway
+    hostname: task-gateway
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - BACKEND_SERVICE_URL=http://task-backend:8080
@@ -75,6 +82,7 @@ services:
   task-frontend:
     image: ghcr.io/bhaskarvasudevan/task-frontend:latest
     container_name: task-frontend
+    hostname: task-frontend
     environment:
       - REACT_APP_API_URL=http://localhost:8080
     ports:
