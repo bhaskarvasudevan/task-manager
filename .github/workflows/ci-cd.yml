@@ -179,9 +179,6 @@ jobs:
           port: ${{ secrets.SERVER_PORT || 22 }}
           source: |
             docker-compose.yml
-            .env
-            nginx/**
-            scripts/**
           target: /opt/task-manager
           overwrite: true
           strip_components: 0
