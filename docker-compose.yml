@@ -8,8 +8,6 @@ services:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=YourStrong@Passw0rd
       - MSSQL_PID=Developer
-    ports:
-      - "1433:1433"
     volumes:
       - mssql-data:/var/opt/mssql
     networks:
@@ -24,8 +22,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: task-redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     networks:
